@@ -206,7 +206,18 @@
         appId: "1:239922567348:web:b8428e085513fcfe2c9fe1",
         measurementId: "G-70C309H2M2"
     };
-    const COLLECTION = "users";
+    /* Public ride requests. One document per account, at most:
+         requests/{uid}  (document ID = the poster's Firebase Auth user ID)
+         {
+           name:      "Alex Tremblay",
+           campus:    "John Abbott College",
+           area:      "kirkland",          // an id from AREAS below
+           comment:   "Mornings around 8 AM, can chip in for gas",
+           createdAt: <serverTimestamp>
+         }
+       No contact info or exact address in here: this collection is public.
+       Accounts without a request have no document, so they get no pin. */
+    const COLLECTION = "requests";
 
     // Open index.html?demo to use made-up data instead of Firestore.
     const DEMO = new URLSearchParams(location.search).has("demo");
@@ -353,8 +364,11 @@
         geoBusy = false;
     }
 
-    // lat/lng first, then the address text, then the geocoder.
+    // Stored area first, then lat/lng, then the address text, then the geocoder.
+    // (The last three are fallbacks for older records and for carpoolUser.)
+    const AREA_BY_ID = new Map(AREAS.map((a) => [a.id, a]));
     function assignArea(u) {
+        if (u.area && AREA_BY_ID.has(u.area)) return AREA_BY_ID.get(u.area);
         if (isNum(u.lat) && isNum(u.lng)) return nearestArea(u.lat, u.lng);
         const byName = areaFromAddress(u.startingAddress);
         if (byName) return byName;
@@ -393,8 +407,9 @@
     let liveError = null;
 
     // Optional: teammates' login page can save the signed-in user like
-    // localStorage.setItem("carpoolUser", JSON.stringify({ startingAddress, campus, lat, lng }))
-    // and this page will ring their area and preselect their campus.
+    // localStorage.setItem("carpoolUser", JSON.stringify({ uid, startingAddress, campus, lat, lng }))
+    // and this page will ring their area, preselect their campus and
+    // label their own request instead of offering to message themselves.
     let me = null;
     try { me = JSON.parse(localStorage.getItem("carpoolUser") || "null"); } catch {}
     if (me && me.campus) campusFilter = me.campus;
@@ -499,13 +514,16 @@
                         </div>
                         <p class="req-dest">Going to ${escapeHtml(r.campus || "a campus not given")}</p>
                         ${r.comment ? `<p class="req-comment">${escapeHtml(r.comment)}</p>` : ""}
-                        <button type="button" class="req-btn" data-id="${escapeHtml(r.id)}">Ask to ride together</button>
+                        ${me && me.uid === r.id
+                            ? `<p class="req-dest">This is your request.</p>`
+                            : `<button type="button" class="req-btn" data-id="${escapeHtml(r.id)}">Ask to ride together</button>`}
                     </li>`).join("")}
             </ul>`;
     }
 
     // Teammates' request/notification code: listen for "carpool:send-request".
-    // detail = { requestId, name, campus, area } — no contact info.
+    // detail = { requestId, name, campus, area }. requestId is also the
+    // poster's user ID (requests/{uid}). No contact info.
     $("areaPanel").addEventListener("click", (e) => {
         const btn = e.target.closest(".req-btn");
         if (!btn) return;
@@ -631,11 +649,12 @@
         ];
         const campuses = ["John Abbott College", "Concordia University", "McGill University", "Vanier College"];
         const out = []; let i = 0;
+        // Demo records follow the public request format (area instead of address).
         for (const [addr, n] of places) for (let k = 0; k < n; k++, i++) {
             const names = ["Alex T.", "Maya R.", "Samuel L.", "Inès B.", "Noah K.", "Chloé D.", "Omar H.", "Léa P."];
             const notes = ["Looking for morning rides around 8 AM on weekdays, can chip in for gas.", "", "Mon/Wed/Fri, back home after 5 PM.", "Have a car, can drive twice a week."];
             out.push({ id: "demo" + i, name: names[i % names.length], comment: notes[i % notes.length], campus: campuses[i % campuses.length],
-                       startingAddress: addr, lat: null, lng: null, createdAt: new Date(Date.now() - i * 3.7 * 3600e3).toISOString() });
+                       area: areaFromAddress(addr)?.id, createdAt: new Date(Date.now() - i * 3.7 * 3600e3).toISOString() });
         }
         return out;
     }
