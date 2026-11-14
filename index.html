@@ -3,322 +3,178 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carpool to School</title>
+    <title>Carpool Map</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
-
-    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
     <style>
         :root {
-            --ink: #18303F;        /* deep harbour blue: text, outlines */
-            --ink-soft: #4E6472;   /* secondary text */
-            --paper: #EEF2F0;      /* cool grey-green page */
+            --ink: #18303F;
+            --ink-soft: #4E6472;
+            --paper: #EEF2F0;
             --card: #FFFFFF;
-            --line: #C9D3CF;       /* field borders */
-            --signal: #FFC21A;     /* school-bus yellow: the one loud colour */
-            --go: #1F7A55;         /* success */
-            --stop: #B3261E;       /* errors */
+            --line: #C9D3CF;
+            --signal: #FFC21A;
+            --stop: #B3261E;
             --radius-field: 10px;
             --radius-panel: 22px;
         }
-
         * { box-sizing: border-box; }
-
         html, body {
-            margin: 0;
-            height: 100%;
-            background: var(--paper);
-            color: var(--ink);
+            margin: 0; height: 100%;
+            background: var(--paper); color: var(--ink);
             font-family: "Archivo", system-ui, sans-serif;
-            font-variation-settings: "wdth" 100;
             -webkit-font-smoothing: antialiased;
         }
 
-        .app {
-            display: grid;
-            grid-template-columns: minmax(360px, 440px) 1fr;
-            height: 100vh;
-        }
+        .app { display: grid; grid-template-columns: minmax(340px, 420px) 1fr; height: 100vh; }
 
-        /* ---------- Panel ---------- */
-        .panel {
-            display: flex;
-            flex-direction: column;
-            padding: 40px 40px 28px;
-            overflow-y: auto;
-        }
-
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-weight: 700;
-            font-size: 1rem;
-            margin-bottom: 56px;
-        }
-        .brand-mark {
-            width: 28px; height: 28px;
-            border-radius: 50%;
-            background: var(--signal);
-            border: 3px solid var(--ink);
-        }
+        /* ---------- Panel (left) ---------- */
+        .panel { display: flex; flex-direction: column; padding: 32px 32px 24px; overflow-y: auto; }
+        .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; margin-bottom: 36px; }
+        .brand-mark { width: 26px; height: 26px; border-radius: 50%; background: var(--signal); border: 3px solid var(--ink); }
 
         h1 {
-            margin: 0 0 16px;
-            font-size: clamp(2.6rem, 4.2vw, 3.4rem);
-            line-height: 0.95;
-            font-weight: 800;
-            font-variation-settings: "wdth" 125;
-            letter-spacing: -0.01em;
+            margin: 0 0 12px;
+            font-size: clamp(2.1rem, 3.4vw, 2.7rem); line-height: .98;
+            font-weight: 800; font-variation-settings: "wdth" 125;
         }
+        .lede { margin: 0 0 28px; line-height: 1.5; color: var(--ink-soft); max-width: 36ch; }
 
-        .lede {
-            margin: 0 0 36px;
-            font-size: 1.05rem;
-            line-height: 1.5;
-            color: var(--ink-soft);
-            max-width: 34ch;
+        .field { display: grid; gap: 7px; margin-bottom: 28px; }
+        label { font-weight: 600; font-size: .95rem; }
+        select {
+            width: 100%; padding: 12px 40px 12px 14px;
+            font: inherit; font-size: 1rem; color: var(--ink);
+            background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%2318303F' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 14px center;
+            border: 1.5px solid var(--line); border-radius: var(--radius-field);
+            appearance: none; cursor: pointer;
         }
+        select:hover { border-color: var(--ink-soft); }
+        select:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px var(--signal); }
 
-        form { display: grid; gap: 20px; }
+        /* Selected area */
+        .area { border-top: 2px solid var(--ink); padding-top: 20px; }
+        .area h2 {
+            margin: 0 0 4px; font-size: 1.5rem; font-weight: 800;
+            font-variation-settings: "wdth" 115;
+        }
+        .area-count { margin: 0 0 16px; color: var(--ink-soft); }
+        .breakdown { list-style: none; margin: 0 0 20px; padding: 0; display: grid; gap: 8px; }
+        .breakdown li { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: .95rem; }
+        .breakdown .bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+        .breakdown .bar span { display: block; height: 100%; background: var(--ink); }
+        .empty { color: var(--ink-soft); line-height: 1.5; margin: 0; }
 
-        .field { display: grid; gap: 7px; }
+        /* Container your teammates' match list renders into */
+        #matchList:empty { display: none; }
 
-        label, .label {
-            font-weight: 600;
-            font-size: 0.95rem;
-        }
-
-        input[type="text"] {
-            width: 100%;
-            padding: 13px 14px;
-            font: inherit;
-            font-size: 1rem;
-            color: var(--ink);
-            background: var(--card);
-            border: 1.5px solid var(--line);
-            border-radius: var(--radius-field);
-            transition: border-color .15s;
-        }
-        input[type="text"]::placeholder { color: #8A9A9F; }
-        input[type="text"]:hover { border-color: var(--ink-soft); }
-        input[type="text"]:focus {
-            outline: none;
-            border-color: var(--ink);
-            box-shadow: 0 0 0 3px var(--signal);
-        }
-        input[aria-invalid="true"] { border-color: var(--stop); }
-
-        .pickup {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 14px;
-            background: var(--card);
-            border: 1.5px dashed var(--line);
-            border-radius: var(--radius-field);
-            font-size: 0.95rem;
-            color: var(--ink-soft);
-        }
-        .pickup.is-set {
-            border-style: solid;
-            border-color: var(--ink);
-            color: var(--ink);
-        }
-        .pickup-dot {
-            flex: none;
-            width: 14px; height: 14px;
-            border-radius: 50%;
-            border: 2px solid currentColor;
-        }
-        .pickup.is-set .pickup-dot { background: var(--signal); border-color: var(--ink); }
-        .pickup-text { flex: 1; line-height: 1.35; }
-
-        .link-btn {
-            flex: none;
-            padding: 4px 2px;
-            font: inherit;
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: var(--ink);
-            background: none;
-            border: none;
-            text-decoration: underline;
-            text-underline-offset: 3px;
-            cursor: pointer;
-        }
-
-        .submit {
-            margin-top: 6px;
-            padding: 16px 20px;
-            font: inherit;
-            font-size: 1.05rem;
-            font-weight: 700;
-            color: var(--ink);
-            background: var(--signal);
-            border: 2px solid var(--ink);
-            border-radius: 999px;
-            cursor: pointer;
-            box-shadow: 0 4px 0 var(--ink);
-            transition: transform .08s, box-shadow .08s;
-        }
-        .submit:hover { background: #FFCD45; }
-        .submit:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
-        .submit:disabled { opacity: .6; cursor: progress; }
-
-        button:focus-visible {
-            outline: 3px solid var(--ink);
-            outline-offset: 3px;
-        }
-
-        .status {
-            min-height: 1.4em;
-            margin: 0;
-            font-size: 0.95rem;
-            line-height: 1.4;
-        }
-        .status.ok { color: var(--go); font-weight: 600; }
-        .status.err { color: var(--stop); font-weight: 600; }
-
-        .foot {
-            margin-top: auto;
-            padding-top: 32px;
-            font-size: 0.8rem;
-            color: var(--ink-soft);
+        .foot { margin-top: auto; padding-top: 28px; font-size: .85rem; color: var(--ink-soft); line-height: 1.5; }
+        .foot .err { color: var(--stop); font-weight: 600; }
+        .live-dot {
+            display: inline-block; width: 8px; height: 8px; margin-right: 6px;
+            border-radius: 50%; background: #1F7A55; vertical-align: 1px;
         }
 
         /* ---------- Map ---------- */
-        .map-wrap {
+        .map-wrap { position: relative; padding: 14px 14px 14px 0; }
+        #map { width: 100%; height: 100%; border-radius: var(--radius-panel); border: 2px solid var(--ink); background: #dfe6e3; }
+
+        /* Neighbourhood landmark */
+        .lm {
             position: relative;
-            padding: 14px 14px 14px 0;
+            transform: translate(-50%, -50%);
+            display: flex; flex-direction: column; align-items: center;
+            cursor: pointer;
         }
-        #map {
-            width: 100%;
-            height: 100%;
-            border-radius: var(--radius-panel);
-            border: 2px solid var(--ink);
-            cursor: crosshair;
-        }
-
-        .map-hint {
-            position: absolute;
-            left: 50%;
-            top: 32px;
-            transform: translateX(-50%);
-            z-index: 500;
-            padding: 9px 16px;
-            background: var(--ink);
-            color: #fff;
-            font-size: 0.9rem;
-            font-weight: 600;
-            border-radius: 999px;
-            pointer-events: none;
-            white-space: nowrap;
-            transition: opacity .25s;
-        }
-        .map-hint.hidden { opacity: 0; }
-
-        /* Pickup pin */
-        .pin {
-            width: 26px; height: 26px;
+        .lm-count {
+            display: grid; place-items: center;
+            width: var(--size); height: var(--size);
             border-radius: 50%;
-            background: var(--signal);
-            border: 4px solid var(--ink);
-            box-shadow: 0 0 0 4px rgba(255, 194, 26, .35);
+            background: var(--signal); color: var(--ink);
+            border: 3px solid var(--ink);
+            font-weight: 800; font-size: calc(var(--size) * .38);
+            font-variation-settings: "wdth" 110;
+            transition: transform .15s;
         }
-        .pin.drop { animation: drop .35s cubic-bezier(.3,1.6,.6,1); }
-        @keyframes drop {
-            from { transform: translateY(-18px) scale(.6); opacity: 0; }
-            to   { transform: none; opacity: 1; }
+        .lm-name {
+            margin-top: 4px; padding: 2px 8px;
+            background: var(--card); border: 1.5px solid var(--ink); border-radius: 999px;
+            font-size: .78rem; font-weight: 700; white-space: nowrap;
         }
+        .lm:hover .lm-count { transform: scale(1.08); }
+        /* Zoomed out: names only on hover or for the selected pin, so West Island pins don't collide */
+        .zoomed-out .lm-name { display: none; position: absolute; top: 100%; }
+        .zoomed-out .lm:hover .lm-name, .zoomed-out .lm.is-selected .lm-name { display: block; }
+        .lm.is-selected .lm-count { background: var(--ink); color: var(--signal); }
+        .lm.is-home .lm-count { box-shadow: 0 0 0 5px var(--card), 0 0 0 7px var(--ink); }
+        .lm.is-dim { opacity: .35; }
 
-        /* Leaflet controls, restyled to match */
-        .leaflet-bar {
-            border: 2px solid var(--ink) !important;
-            border-radius: 12px !important;
-            overflow: hidden;
-            box-shadow: none !important;
+        /* Campus (destination) marker */
+        .campus {
+            transform: translate(-50%, -50%);
+            display: flex; align-items: center; gap: 6px;
+            padding: 5px 10px 5px 6px;
+            background: var(--ink); color: #fff;
+            border-radius: 8px; font-size: .8rem; font-weight: 700; white-space: nowrap;
         }
-        .leaflet-bar a {
-            width: 36px !important; height: 36px !important; line-height: 34px !important;
-            color: var(--ink) !important;
-            font-family: "Archivo", sans-serif;
-        }
+        .campus::before { content: ""; width: 12px; height: 12px; border-radius: 3px; background: var(--signal); }
+
+        .leaflet-marker-icon:focus-visible .lm-count { outline: 3px solid var(--ink); outline-offset: 3px; }
+        .leaflet-bar { border: 2px solid var(--ink) !important; border-radius: 12px !important; overflow: hidden; box-shadow: none !important; }
+        .leaflet-bar a { width: 36px !important; height: 36px !important; line-height: 34px !important; color: var(--ink) !important; }
         .leaflet-container { font-family: "Archivo", system-ui, sans-serif; }
-        .leaflet-control-attribution { border-radius: 8px 0 0 0; }
 
-        /* ---------- Small screens ---------- */
         @media (max-width: 820px) {
-            .app {
-                grid-template-columns: 1fr;
-                grid-template-rows: 46vh auto;
-                height: auto;
-            }
-            .map-wrap { order: -1; padding: 12px 12px 0; height: 46vh; }
-            .map-hint { top: 26px; }
-            .panel { padding: 28px 20px 24px; overflow: visible; }
-            .brand { margin-bottom: 28px; }
+            .app { grid-template-columns: 1fr; grid-template-rows: 55vh auto; height: auto; }
+            .map-wrap { order: -1; padding: 12px 12px 0; height: 55vh; }
+            .panel { padding: 24px 20px; overflow: visible; }
+            .brand { margin-bottom: 20px; }
         }
-
-        @media (prefers-reduced-motion: reduce) {
-            *, *::before, *::after { animation: none !important; transition: none !important; }
-        }
+        @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
     </style>
 </head>
 <body>
 
 <div class="app">
-    <section class="panel">
+    <aside class="panel">
         <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Carpool</div>
 
-        <h1>Share the ride to school</h1>
-        <p class="lede">Tell us who you are and where you'll be picked up, so we can match you with families heading the same way.</p>
+        <h1>Find people going your way</h1>
+        <p class="lede">Each pin is a neighbourhood. The number is how many students there are looking for a ride.</p>
 
-        <form id="signupForm" novalidate>
-            <div class="field">
-                <label for="nameInput">Your name</label>
-                <input type="text" id="nameInput" autocomplete="name" placeholder="e.g. Camille Tremblay">
-            </div>
+        <div class="field">
+            <label for="campusFilter">Going to</label>
+            <select id="campusFilter">
+                <option value="">Any campus</option>
+            </select>
+        </div>
 
-            <div class="field">
-                <label for="schoolInput">School</label>
-                <input type="text" id="schoolInput" autocomplete="organization" placeholder="e.g. École Saint-Laurent">
-            </div>
+        <section class="area" id="areaPanel" aria-live="polite">
+            <p class="empty">Pick a pin on the map to see who's looking for a ride there.</p>
+        </section>
 
-            <div class="field">
-                <span id="pickupLabel" class="label">Pickup spot</span>
-                <div class="pickup" id="pickupBox" aria-labelledby="pickupLabel">
-                    <span class="pickup-dot" aria-hidden="true"></span>
-                    <span class="pickup-text" id="pickupText">Tap the map to place your pin</span>
-                    <button type="button" class="link-btn" id="locateBtn">Use my location</button>
-                </div>
-            </div>
+        <!-- Match-making results go here (teammates' code). Listen for the
+             "carpool:area-select" event to know which area was picked. -->
+        <div id="matchList"></div>
 
-            <button type="submit" class="submit" id="submitBtn">Join the carpool</button>
-            <p class="status" id="status" role="status" aria-live="polite"></p>
-        </form>
-
-        <p class="foot">Montreal pilot, built at a hackathon</p>
-    </section>
+        <p class="foot" id="footer">Loading requests…</p>
+    </aside>
 
     <div class="map-wrap">
-        <div id="map" aria-label="Map. Click to set your pickup spot."></div>
-        <div class="map-hint" id="mapHint">Tap where you'd like to be picked up</div>
+        <div id="map" role="application" aria-label="Map of carpool requests grouped by neighbourhood"></div>
     </div>
 </div>
 
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<!-- Firebase & Map Logic -->
 <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.3.0/firebase-app.js";
-    import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js";
-
+    /* ================================================================
+       CONFIG
+       ================================================================ */
     const firebaseConfig = {
         apiKey: "AIzaSyAEIVTEafHPn9G7AAnW04EjYFBq65-bKSI",
         authDomain: "carpool-47bf9.firebaseapp.com",
@@ -328,104 +184,402 @@
         appId: "1:239922567348:web:b8428e085513fcfe2c9fe1",
         measurementId: "G-70C309H2M2"
     };
+    const COLLECTION = "users";
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    // Open index.html?demo to use made-up data instead of Firestore.
+    const DEMO = new URLSearchParams(location.search).has("demo");
 
-    // ---- Map (centred on Montreal) ----
-    const map = L.map('map', { zoomControl: false }).setView([45.5017, -73.5673], 12);
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // Neighbourhood landmarks. Everyone is shown at their landmark, never at
+    // their own address. `aliases` are matched against the city part of
+    // startingAddress (lowercase, no accents, "st" -> "saint").
+    const AREAS = [
+        { id: "kirkland",      name: "Kirkland",               lat: 45.4500, lng: -73.8667, aliases: ["kirkland"] },
+        { id: "ile-bizard",    name: "Île-Bizard",             lat: 45.4950, lng: -73.8900, aliases: ["ile bizard", "l ile bizard"] },
+        { id: "pierrefonds",   name: "Pierrefonds-Roxboro",    lat: 45.4897, lng: -73.8467, aliases: ["pierrefonds", "roxboro"] },
+        { id: "ddo",           name: "Dollard-des-Ormeaux",    lat: 45.4944, lng: -73.8247, aliases: ["dollard des ormeaux", "dollard", "ddo"] },
+        { id: "pointe-claire", name: "Pointe-Claire",          lat: 45.4486, lng: -73.8167, aliases: ["pointe claire"] },
+        { id: "beaconsfield",  name: "Beaconsfield",           lat: 45.4314, lng: -73.8650, aliases: ["beaconsfield", "baie d urfe"] },
+        { id: "sainte-anne",   name: "Sainte-Anne-de-Bellevue", lat: 45.4039, lng: -73.9525, aliases: ["sainte anne de bellevue", "senneville"] },
+        { id: "dorval",        name: "Dorval",                 lat: 45.4475, lng: -73.7500, aliases: ["dorval"] },
+        { id: "saint-laurent", name: "Saint-Laurent",          lat: 45.5076, lng: -73.6950, aliases: ["saint laurent", "ville saint laurent"] },
+        { id: "ahuntsic",      name: "Ahuntsic-Cartierville",  lat: 45.5500, lng: -73.6700, aliases: ["ahuntsic", "cartierville"] },
+        { id: "lachine",       name: "Lachine",                lat: 45.4400, lng: -73.6800, aliases: ["lachine"] },
+        { id: "lasalle",       name: "LaSalle",                lat: 45.4300, lng: -73.6300, aliases: ["lasalle", "la salle"] },
+        { id: "verdun",        name: "Verdun",                 lat: 45.4580, lng: -73.5700, aliases: ["verdun", "ile des soeurs"] },
+        { id: "ndg",           name: "Côte-des-Neiges–NDG",    lat: 45.4800, lng: -73.6200, aliases: ["cote des neiges", "notre dame de grace", "ndg"] },
+        { id: "westmount",     name: "Westmount",              lat: 45.4850, lng: -73.5960, aliases: ["westmount"] },
+        { id: "mont-royal",    name: "Mount Royal",            lat: 45.5160, lng: -73.6430, aliases: ["mont royal", "town of mount royal", "tmr"] },
+        { id: "outremont",     name: "Outremont",              lat: 45.5150, lng: -73.6080, aliases: ["outremont"] },
+        { id: "downtown",      name: "Downtown",               lat: 45.5017, lng: -73.5673, aliases: ["ville marie", "downtown"] },
+        { id: "plateau",       name: "Plateau",                lat: 45.5225, lng: -73.5800, aliases: ["plateau"] },
+        { id: "rosemont",      name: "Rosemont",               lat: 45.5450, lng: -73.5850, aliases: ["rosemont", "petite patrie"] },
+        { id: "villeray",      name: "Villeray",               lat: 45.5450, lng: -73.6250, aliases: ["villeray", "parc extension"] },
+        { id: "hochelaga",     name: "Hochelaga",              lat: 45.5470, lng: -73.5400, aliases: ["hochelaga", "maisonneuve"] },
+        { id: "montreal-nord", name: "Montréal-Nord",          lat: 45.6000, lng: -73.6300, aliases: ["montreal nord"] },
+        { id: "saint-leonard", name: "Saint-Léonard",          lat: 45.5850, lng: -73.5950, aliases: ["saint leonard"] },
+        { id: "laval",         name: "Laval",                  lat: 45.5700, lng: -73.7200, aliases: ["laval"] },
+        { id: "longueuil",     name: "Longueuil",              lat: 45.5310, lng: -73.5180, aliases: ["longueuil", "brossard", "saint lambert"] },
+    ];
+
+    // Known campuses get a marker when picked in the "Going to" filter.
+    // Keys are normalised campus names (see norm()).
+    const CAMPUSES = {
+        "john abbott college":      [45.4065, -73.9425],
+        "mcgill university":        [45.5048, -73.5772],
+        "concordia university":     [45.4973, -73.5790],
+        "concordia sgw":            [45.4973, -73.5790],
+        "concordia loyola":         [45.4582, -73.6405],
+        "universite de montreal":   [45.5017, -73.6153],
+        "polytechnique montreal":   [45.5045, -73.6130],
+        "dawson college":           [45.4890, -73.5860],
+        "vanier college":           [45.5140, -73.6750],
+        "ets":                      [45.4946, -73.5622],
+        "uqam":                     [45.5130, -73.5600],
+    };
+
+    /* ================================================================
+       HELPERS
+       ================================================================ */
+    const $ = (id) => document.getElementById(id);
+    const isNum = (v) => typeof v === "number" && Number.isFinite(v);
+
+    // "Île-Bizard, QC" -> "ile bizard qc"; "St-Laurent" -> "saint laurent"
+    function norm(s) {
+        return String(s || "")
+            .toLowerCase()
+            .normalize("NFD").replace(/[̀-ͯ]/g, "")
+            .replace(/[^a-z0-9]+/g, " ")
+            .replace(/\bste\b/g, "sainte").replace(/\bst\b/g, "saint")
+            .trim();
+    }
+
+    function distanceKm(aLat, aLng, bLat, bLng) {
+        const R = 6371, toRad = (d) => d * Math.PI / 180;
+        const dLat = toRad(bLat - aLat), dLng = toRad(bLng - aLng);
+        const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+        return 2 * R * Math.asin(Math.sqrt(h));
+    }
+
+    function nearestArea(lat, lng) {
+        let best = null, bestD = Infinity;
+        for (const a of AREAS) {
+            const d = distanceKm(lat, lng, a.lat, a.lng);
+            if (d < bestD) { best = a; bestD = d; }
+        }
+        return bestD <= 25 ? best : null;   // ignore points far outside Montreal
+    }
+
+    // Only look at the part after the first comma, so a street like
+    // "Boul. Saint-Laurent" doesn't put someone in the Saint-Laurent borough.
+    function areaFromAddress(address) {
+        const parts = String(address || "").split(",");
+        const cityPart = norm(parts.length > 1 ? parts.slice(1).join(" ") : parts[0]);
+        if (!cityPart) return null;
+        const padded = ` ${cityPart} `;
+        for (const a of AREAS) {
+            if (a.aliases.some((al) => padded.includes(` ${al} `))) return a;
+        }
+        return null;
+    }
+
+    /* ---------- Fallback geocoding (Nominatim) ----------
+       Used only for addresses that neither have lat/lng nor name a known
+       area (e.g. "123 Rue Sainte-Catherine O, Montreal"). Results are cached
+       in this browser and requests are spaced 1.1 s apart, as Nominatim's
+       usage policy asks. The coordinates are only used to choose a
+       landmark; they are never shown. */
+    const GEO_CACHE_KEY = "carpool.geocache.v1";
+    let geoCache = {};
+    try { geoCache = JSON.parse(localStorage.getItem(GEO_CACHE_KEY) || "{}"); } catch {}
+    const geoQueue = [];
+    const geoQueued = new Set();
+    let geoBusy = false;
+    const GEO_LIMIT = 40;          // max lookups per page load
+    let geoUsed = 0;
+
+    function cachedGeocode(address) {
+        const key = norm(address);
+        return key in geoCache ? geoCache[key] : undefined;   // null = looked up, not found
+    }
+
+    function queueGeocode(address) {
+        const key = norm(address);
+        if (!key || key in geoCache || geoQueued.has(key) || geoUsed >= GEO_LIMIT) return;
+        geoQueued.add(key);
+        geoQueue.push({ key, address });
+        runGeoQueue();
+    }
+
+    async function runGeoQueue() {
+        if (geoBusy || DEMO) return;
+        geoBusy = true;
+        while (geoQueue.length && geoUsed < GEO_LIMIT) {
+            const { key, address } = geoQueue.shift();
+            geoUsed++;
+            try {
+                const url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ca&q=" + encodeURIComponent(address);
+                const res = await fetch(url, { headers: { "Accept-Language": "en,fr" } });
+                const data = res.ok ? await res.json() : [];
+                geoCache[key] = data[0] ? [Number(data[0].lat), Number(data[0].lon)] : null;
+            } catch {
+                geoCache[key] = null;
+            }
+            try { localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(geoCache)); } catch {}
+            render();
+            await new Promise((r) => setTimeout(r, 1100));
+        }
+        geoBusy = false;
+    }
+
+    // lat/lng first, then the address text, then the geocoder.
+    function assignArea(u) {
+        if (isNum(u.lat) && isNum(u.lng)) return nearestArea(u.lat, u.lng);
+        const byName = areaFromAddress(u.startingAddress);
+        if (byName) return byName;
+        const geo = cachedGeocode(u.startingAddress);
+        if (geo) return nearestArea(geo[0], geo[1]);
+        if (geo === undefined && u.startingAddress) queueGeocode(u.startingAddress);
+        return null;
+    }
+
+    /* ================================================================
+       MAP
+       ================================================================ */
+    const map = L.map("map", { zoomControl: false }).setView([45.4950, -73.7300], 11);
+    L.control.zoom({ position: "bottomright" }).addTo(map);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
-        referrerPolicy: 'strict-origin-when-cross-origin',
+        referrerPolicy: "strict-origin-when-cross-origin",
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    const $ = (id) => document.getElementById(id);
-    const pinIcon = L.divIcon({ className: '', html: '<div class="pin drop"></div>', iconSize: [26, 26], iconAnchor: [13, 13] });
+    const landmarkLayer = L.layerGroup().addTo(map);
+    const syncZoomClass = () => map.getContainer().classList.toggle("zoomed-out", map.getZoom() < 13);
+    map.on("zoomend", syncZoomClass);
+    syncZoomClass();
+    let fittedOnce = false;
+    const campusLayer = L.layerGroup().addTo(map);
 
-    let pickup = null;
-    let marker = null;
+    /* ================================================================
+       STATE + RENDER
+       ================================================================ */
+    let requests = [];          // raw docs from Firestore
+    let groups = new Map();     // areaId -> { area, list: [doc] }
+    let unplaced = 0;
+    let selectedId = null;
+    let campusFilter = "";
+    let liveError = null;
 
-    function setPickup(lat, lng, source) {
-        pickup = { lat, lng };
-        if (marker) map.removeLayer(marker);
-        marker = L.marker([lat, lng], { icon: pinIcon, keyboard: false }).addTo(map);
-        $('pickupBox').classList.add('is-set');
-        $('pickupText').textContent = source === 'gps'
-            ? 'Pin set at your current location'
-            : `Pin set at ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-        $('mapHint').classList.add('hidden');
+    // Optional: teammates' login page can save the signed-in user like
+    // localStorage.setItem("carpoolUser", JSON.stringify({ startingAddress, campus, lat, lng }))
+    // and this page will ring their area and preselect their campus.
+    let me = null;
+    try { me = JSON.parse(localStorage.getItem("carpoolUser") || "null"); } catch {}
+    if (me && me.campus) campusFilter = me.campus;
+
+    function buildGroups() {
+        groups = new Map();
+        unplaced = 0;
+        for (const r of requests) {
+            if (campusFilter && norm(r.campus) !== norm(campusFilter)) continue;
+            const area = assignArea(r);
+            if (!area) { unplaced++; continue; }
+            if (!groups.has(area.id)) groups.set(area.id, { area, list: [] });
+            groups.get(area.id).list.push(r);
+        }
     }
 
-    map.on('click', (e) => setPickup(e.latlng.lat, e.latlng.lng, 'map'));
-
-    $('locateBtn').addEventListener('click', () => {
-        if (!navigator.geolocation) {
-            showStatus('err', "This browser can't share your location. Tap the map instead.");
-            return;
+    function renderCampusOptions() {
+        const counts = new Map();
+        for (const r of requests) {
+            if (!r.campus) continue;
+            const k = norm(r.campus);
+            if (!counts.has(k)) counts.set(k, { label: r.campus, n: 0 });
+            counts.get(k).n++;
         }
-        $('pickupText').textContent = 'Finding you…';
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                const { latitude, longitude } = pos.coords;
-                setPickup(latitude, longitude, 'gps');
-                map.setView([latitude, longitude], 15);
-            },
-            () => {
-                $('pickupText').textContent = 'Tap the map to place your pin';
-                showStatus('err', 'Location access was blocked. Tap the map to set your pickup spot.');
-            }
-        );
-    });
-
-    // ---- Form ----
-    function showStatus(kind, msg) {
-        const el = $('status');
-        el.className = 'status ' + kind;
-        el.textContent = msg;
+        const sel = $("campusFilter");
+        const sorted = [...counts.values()].sort((a, b) => b.n - a.n);
+        sel.innerHTML = '<option value="">Any campus</option>' + sorted
+            .map((c) => `<option value="${escapeHtml(c.label)}">${escapeHtml(c.label)} (${c.n})</option>`)
+            .join("");
+        // keep the current choice if it still exists
+        const match = sorted.find((c) => norm(c.label) === norm(campusFilter));
+        sel.value = match ? match.label : "";
+        if (!match) campusFilter = "";
     }
 
-    $('signupForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const nameEl = $('nameInput');
-        const schoolEl = $('schoolInput');
-        const name = nameEl.value.trim();
-        const school = schoolEl.value.trim();
+    function renderMarkers() {
+        landmarkLayer.clearLayers();
+        const meArea = me ? assignArea(me) : null;
+        const max = Math.max(1, ...[...groups.values()].map((g) => g.list.length));
 
-        nameEl.setAttribute('aria-invalid', !name);
-        schoolEl.setAttribute('aria-invalid', !school);
+        for (const { area, list } of groups.values()) {
+            const n = list.length;
+            const size = Math.round(30 + 18 * Math.sqrt(n / max));   // 30–48 px
+            const classes = ["lm"];
+            if (area.id === selectedId) classes.push("is-selected");
+            if (meArea && area.id === meArea.id) classes.push("is-home");
+            if (selectedId && area.id !== selectedId) classes.push("is-dim");
 
-        if (!name || !school) {
-            showStatus('err', 'Add your name and school to join.');
-            (!name ? nameEl : schoolEl).focus();
-            return;
-        }
-
-        const btn = $('submitBtn');
-        btn.disabled = true;
-        btn.textContent = 'Joining…';
-        showStatus('', '');
-
-        try {
-            const docRef = await addDoc(collection(db, "users"), {
-                name,
-                school,
-                lat: pickup ? pickup.lat : 45.5017,  // falls back to Montreal centre
-                lng: pickup ? pickup.lng : -73.5673,
-                createdAt: Date.now()
+            const icon = L.divIcon({
+                className: "",
+                iconSize: null,
+                html: `<div class="${classes.join(" ")}" style="--size:${size}px">
+                         <span class="lm-count">${n}</span>
+                         <span class="lm-name">${escapeHtml(area.name)}</span>
+                       </div>`
             });
-            console.log("Document written with ID: ", docRef.id);
-            showStatus('ok', `You're in, ${name}. We'll look for rides to ${school}.`);
-            e.target.reset();
-        } catch (err) {
-            console.error("Error adding document: ", err);
-            showStatus('err', "Couldn't save your sign-up. Check your connection and try again.");
-        } finally {
-            btn.disabled = false;
-            btn.textContent = 'Join the carpool';
+            const marker = L.marker([area.lat, area.lng], {
+                icon,
+                keyboard: true,
+                title: `${area.name}: ${n} ${n === 1 ? "request" : "requests"}`,
+                riseOnHover: true,
+                zIndexOffset: area.id === selectedId ? 1000 : n
+            });
+            marker.on("click", () => selectArea(area.id === selectedId ? null : area.id));
+            marker.addTo(landmarkLayer);
         }
+
+        campusLayer.clearLayers();
+        const c = campusFilter && CAMPUSES[norm(campusFilter)];
+        if (c) {
+            L.marker(c, {
+                icon: L.divIcon({ className: "", iconSize: null, html: `<div class="campus">${escapeHtml(campusFilter)}</div>` }),
+                interactive: false
+            }).addTo(campusLayer);
+        }
+    }
+
+    function renderAreaPanel() {
+        const panel = $("areaPanel");
+        const g = selectedId && groups.get(selectedId);
+        if (!g) {
+            panel.innerHTML = `<p class="empty">${groups.size
+                ? "Pick a pin on the map to see who's looking for a ride there."
+                : campusFilter
+                    ? `No one heading to ${escapeHtml(campusFilter)} has posted a request yet.`
+                    : "No requests yet. Be the first to post one."}</p>`;
+            return;
+        }
+        const n = g.list.length;
+        // Privacy: only counts per campus, no names or addresses.
+        const byCampus = new Map();
+        for (const r of g.list) {
+            const label = r.campus || "Campus not given";
+            byCampus.set(label, (byCampus.get(label) || 0) + 1);
+        }
+        const rows = [...byCampus.entries()].sort((a, b) => b[1] - a[1]);
+        panel.innerHTML = `
+            <h2>${escapeHtml(g.area.name)}</h2>
+            <p class="area-count">${n} ${n === 1 ? "student is" : "students are"} looking for a ride from here</p>
+            <ul class="breakdown">
+                ${rows.map(([label, k]) => `
+                    <li><span>${escapeHtml(label)}</span><span>${k}</span>
+                        <span class="bar"><span style="width:${(k / n) * 100}%"></span></span></li>`).join("")}
+            </ul>`;
+    }
+
+    function renderFooter() {
+        const total = [...groups.values()].reduce((s, g) => s + g.list.length, 0);
+        let html = liveError
+            ? `<span class="err">${liveError}</span>`
+            : `<span class="live-dot" aria-hidden="true"></span>${DEMO ? "Demo data. " : ""}${total} ${total === 1 ? "request" : "requests"} on the map, updated live.`;
+        if (unplaced) {
+            html += `<br>${unplaced} more couldn't be placed${geoQueue.length || geoBusy ? " yet (still looking up addresses)" : " because their address wasn't recognised"}.`;
+        }
+        $("footer").innerHTML = html;
+    }
+
+    function render() {
+        buildGroups();
+        if (selectedId && !groups.has(selectedId)) selectedId = null;
+        renderMarkers();
+        renderAreaPanel();
+        renderFooter();
+    }
+
+    function selectArea(id) {
+        selectedId = id;
+        render();
+        const g = id && groups.get(id);
+        // For teammates: the match list can listen for this event.
+        window.dispatchEvent(new CustomEvent("carpool:area-select", {
+            detail: g ? { areaId: id, areaName: g.area.name, campus: campusFilter || null, requests: g.list } : null
+        }));
+    }
+
+    $("campusFilter").addEventListener("change", (e) => {
+        campusFilter = e.target.value;
+        selectedId = null;
+        render();
+        const c = campusFilter && CAMPUSES[norm(campusFilter)];
+        if (c) map.flyTo(c, Math.min(map.getZoom(), 11), { duration: 0.6 });
     });
+
+    function escapeHtml(s) {
+        return String(s ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+    }
+
+    function onData(docs) {
+        requests = docs;
+        liveError = null;
+        renderCampusOptions();
+        render();
+        if (!fittedOnce && groups.size) {
+            fittedOnce = true;
+            const pts = [...groups.values()].map((g) => [g.area.lat, g.area.lng]);
+            map.fitBounds(pts, { padding: [60, 60], maxZoom: 12 });
+        }
+    }
+
+    // Small API for teammates: window.carpoolMap.selectArea("kirkland"), etc.
+    window.carpoolMap = {
+        map,
+        areas: AREAS,
+        selectArea,
+        getGroups: () => groups,
+        setCampus(campus) { $("campusFilter").value = campus || ""; $("campusFilter").dispatchEvent(new Event("change")); },
+        assignArea,
+    };
+
+    /* ================================================================
+       DATA
+       ================================================================ */
+    if (DEMO) {
+        onData(makeDemoData());
+    } else {
+        const { initializeApp } = await import("https://www.gstatic.com/firebasejs/11.3.0/firebase-app.js");
+        const { getFirestore, collection, onSnapshot } = await import("https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js");
+        const db = getFirestore(initializeApp(firebaseConfig));
+
+        // Live: the map updates whenever someone adds or removes a request.
+        onSnapshot(collection(db, COLLECTION),
+            (snap) => onData(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+            (err) => {
+                console.error("Firestore read failed:", err);
+                liveError = err.code === "permission-denied"
+                    ? "The database refused the read. Check the Firestore security rules."
+                    : "Couldn't load requests. Check your connection and refresh.";
+                renderFooter();
+            });
+    }
+
+    function makeDemoData() {
+        const places = [
+            ["12 Rue Mercier, Kirkland, QC", 5], ["8 Rue Cherrier, L'Île-Bizard, QC", 3],
+            ["450 Boul. Saint-Charles, Pierrefonds, QC", 4], ["22 Rue Spring Garden, Dollard-des-Ormeaux, QC", 6],
+            ["99 Av. Donegani, Pointe-Claire, QC", 2], ["2000 Boul. Thimens, St-Laurent, QC", 7],
+            ["123 Rue Sainte-Catherine O, Ville-Marie, Montreal, QC", 3], ["5 Av. Laurier, Outremont, QC", 1],
+            ["300 Rue Principale, Dorval, QC", 2], ["700 Boul. Saint-Laurent, Laval, QC", 2],
+        ];
+        const campuses = ["John Abbott College", "Concordia University", "McGill University", "Vanier College"];
+        const out = []; let i = 0;
+        for (const [addr, n] of places) for (let k = 0; k < n; k++, i++) {
+            out.push({ id: "demo" + i, name: "Demo " + i, campus: campuses[i % campuses.length],
+                       startingAddress: addr, lat: null, lng: null, createdAt: new Date().toISOString() });
+        }
+        return out;
+    }
 </script>
 </body>
 </html>
