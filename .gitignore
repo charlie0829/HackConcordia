@@ -3,3 +3,4 @@ serviceAccountKey.json
 *-firebase-adminsdk-*.json
 tools/seed/node_modules/
 tools/seed/mock-requests.preview.json
+README.md
