@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Private profile: only the owner.
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Ride requests: at most one per account (document ID = the poster's uid).
+    // Any signed-in user can read them so the map, list and matching work.
+    match /requests/{uid} {
+      allow read: if request.auth != null;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(
+             ['name', 'campus', 'comment', 'area', 'startingAddress', 'lat', 'lng', 'gender', 'createdAt'])
+        && request.resource.data.name is string
+        && request.resource.data.campus is string
+        && request.resource.data.area is string
+        && request.resource.data.startingAddress is string
+        && request.resource.data.lat is number
+        && request.resource.data.lng is number
+        && (!('gender' in request.resource.data) || request.resource.data.gender in ['Female', 'Male', 'Other']);
+    }
+
+    // "Ask to ride together": ride_requests/{senderId}_{receiverId}.
+    // Only the two people involved can see it. The sender creates it as
+    // pending; only the receiver can accept/decline (and add their contact).
+    match /ride_requests/{id} {
+      allow read: if request.auth != null
+        && (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
+      allow create: if request.auth != null
+        && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.receiverId != request.auth.uid
+        && id == request.auth.uid + '_' + request.resource.data.receiverId
+        && request.resource.data.status == 'pending'
+        && request.resource.data.receiverContact == '';
+      allow update: if request.auth != null
+        && resource.data.receiverId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'receiverContact'])
+        && request.resource.data.status in ['accepted', 'declined'];
+      allow delete: if request.auth != null && resource.data.senderId == request.auth.uid;
+    }
+  }
+}
