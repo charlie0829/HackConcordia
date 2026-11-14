@@ -69,6 +69,28 @@
         .breakdown .bar span { display: block; height: 100%; background: var(--ink); }
         .empty { color: var(--ink-soft); line-height: 1.5; margin: 0; }
 
+        /* Public requests in the selected area */
+        .requests { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+        .req {
+            padding: 14px 16px;
+            background: var(--card);
+            border: 1.5px solid var(--line);
+            border-radius: 14px;
+        }
+        .req-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+        .req-name { margin: 0; font-size: 1.05rem; font-weight: 700; }
+        .req-time { flex: none; font-size: .82rem; color: var(--ink-soft); }
+        .req-dest { margin: 2px 0 0; font-size: .95rem; color: var(--ink-soft); }
+        .req-comment { margin: 10px 0 0; line-height: 1.45; font-size: .95rem; }
+        .req-btn {
+            margin-top: 12px; padding: 9px 16px;
+            font: inherit; font-size: .9rem; font-weight: 700; color: var(--ink);
+            background: var(--signal); border: 2px solid var(--ink); border-radius: 999px;
+            cursor: pointer;
+        }
+        .req-btn:hover { background: #FFCD45; }
+        .req-btn:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
         /* Container your teammates' match list renders into */
         #matchList:empty { display: none; }
 
@@ -144,7 +166,7 @@
         <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Carpool</div>
 
         <h1>Find people going your way</h1>
-        <p class="lede">Each pin is a neighbourhood. The number is how many students there are looking for a ride.</p>
+        <p class="lede">Each pin is a neighbourhood. The number is how many ride requests have been posted from there.</p>
 
         <div class="field">
             <label for="campusFilter">Going to</label>
@@ -154,7 +176,7 @@
         </div>
 
         <section class="area" id="areaPanel" aria-live="polite">
-            <p class="empty">Pick a pin on the map to see who's looking for a ride there.</p>
+            <p class="empty">Pick a pin on the map to see the ride requests posted there.</p>
         </section>
 
         <!-- Match-making results go here (teammates' code). Listen for the
@@ -455,28 +477,63 @@
         const g = selectedId && groups.get(selectedId);
         if (!g) {
             panel.innerHTML = `<p class="empty">${groups.size
-                ? "Pick a pin on the map to see who's looking for a ride there."
+                ? "Pick a pin on the map to see the ride requests posted there."
                 : campusFilter
                     ? `No one heading to ${escapeHtml(campusFilter)} has posted a request yet.`
                     : "No requests yet. Be the first to post one."}</p>`;
             return;
         }
         const n = g.list.length;
-        // Privacy: only counts per campus, no names or addresses.
-        const byCampus = new Map();
-        for (const r of g.list) {
-            const label = r.campus || "Campus not given";
-            byCampus.set(label, (byCampus.get(label) || 0) + 1);
-        }
-        const rows = [...byCampus.entries()].sort((a, b) => b[1] - a[1]);
+        // Public view: name, general area, destination and comment.
+        // Contact info and the exact starting address are never shown.
+        const list = [...g.list].sort((a, b) => toTime(b.createdAt) - toTime(a.createdAt));
         panel.innerHTML = `
             <h2>${escapeHtml(g.area.name)}</h2>
-            <p class="area-count">${n} ${n === 1 ? "student is" : "students are"} looking for a ride from here</p>
-            <ul class="breakdown">
-                ${rows.map(([label, k]) => `
-                    <li><span>${escapeHtml(label)}</span><span>${k}</span>
-                        <span class="bar"><span style="width:${(k / n) * 100}%"></span></span></li>`).join("")}
+            <p class="area-count">${n} ride ${n === 1 ? "request" : "requests"} from this area${campusFilter ? ` going to ${escapeHtml(campusFilter)}` : ""}</p>
+            <ul class="requests">
+                ${list.map((r) => `
+                    <li class="req">
+                        <div class="req-head">
+                            <p class="req-name">${escapeHtml(r.name || "Anonymous")}</p>
+                            ${toTime(r.createdAt) ? `<span class="req-time">${timeAgo(toTime(r.createdAt))}</span>` : ""}
+                        </div>
+                        <p class="req-dest">Going to ${escapeHtml(r.campus || "a campus not given")}</p>
+                        ${r.comment ? `<p class="req-comment">${escapeHtml(r.comment)}</p>` : ""}
+                        <button type="button" class="req-btn" data-id="${escapeHtml(r.id)}">Ask to ride together</button>
+                    </li>`).join("")}
             </ul>`;
+    }
+
+    // Teammates' request/notification code: listen for "carpool:send-request".
+    // detail = { requestId, name, campus, area } — no contact info.
+    $("areaPanel").addEventListener("click", (e) => {
+        const btn = e.target.closest(".req-btn");
+        if (!btn) return;
+        const r = requests.find((x) => x.id === btn.dataset.id);
+        if (!r) return;
+        window.dispatchEvent(new CustomEvent("carpool:send-request", {
+            detail: { requestId: r.id, name: r.name, campus: r.campus, area: assignArea(r)?.name || null }
+        }));
+    });
+
+    // createdAt may be an ISO string, a number (ms) or a Firestore Timestamp.
+    function toTime(v) {
+        if (!v) return 0;
+        if (typeof v === "number") return v;
+        if (typeof v.toMillis === "function") return v.toMillis();
+        const t = Date.parse(v);
+        return Number.isNaN(t) ? 0 : t;
+    }
+
+    function timeAgo(ms) {
+        const mins = Math.round((Date.now() - ms) / 60000);
+        if (mins < 1) return "just now";
+        if (mins < 60) return `${mins} min ago`;
+        const hrs = Math.round(mins / 60);
+        if (hrs < 24) return `${hrs} h ago`;
+        const days = Math.round(hrs / 24);
+        return days === 1 ? "yesterday" : days < 30 ? `${days} days ago`
+            : new Date(ms).toLocaleDateString("en-CA", { month: "short", day: "numeric" });
     }
 
     function renderFooter() {
@@ -575,8 +632,10 @@
         const campuses = ["John Abbott College", "Concordia University", "McGill University", "Vanier College"];
         const out = []; let i = 0;
         for (const [addr, n] of places) for (let k = 0; k < n; k++, i++) {
-            out.push({ id: "demo" + i, name: "Demo " + i, campus: campuses[i % campuses.length],
-                       startingAddress: addr, lat: null, lng: null, createdAt: new Date().toISOString() });
+            const names = ["Alex T.", "Maya R.", "Samuel L.", "Inès B.", "Noah K.", "Chloé D.", "Omar H.", "Léa P."];
+            const notes = ["Looking for morning rides around 8 AM on weekdays, can chip in for gas.", "", "Mon/Wed/Fri, back home after 5 PM.", "Have a car, can drive twice a week."];
+            out.push({ id: "demo" + i, name: names[i % names.length], comment: notes[i % notes.length], campus: campuses[i % campuses.length],
+                       startingAddress: addr, lat: null, lng: null, createdAt: new Date(Date.now() - i * 3.7 * 3600e3).toISOString() });
         }
         return out;
     }
