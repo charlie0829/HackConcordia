@@ -64,6 +64,7 @@ export function norm(s) {
         .replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+export const CAMPUS_NAMES = Object.keys(CAMPUS_LIST);
 const CAMPUS_BY_NORM = new Map(Object.entries(CAMPUS_LIST).map(([k, v]) => [norm(k), v]));
 export const campusCoords = (name) => CAMPUS_BY_NORM.get(norm(name)) || null;
 

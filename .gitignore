@@ -1,0 +1,5 @@
+# Firebase admin key: full access to the project. Never commit it.
+serviceAccountKey.json
+*-firebase-adminsdk-*.json
+tools/seed/node_modules/
+tools/seed/mock-requests.preview.json
