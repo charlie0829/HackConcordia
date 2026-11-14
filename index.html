@@ -206,17 +206,21 @@
         appId: "1:239922567348:web:b8428e085513fcfe2c9fe1",
         measurementId: "G-70C309H2M2"
     };
-    /* Public ride requests. One document per account, at most:
+    /* Ride requests. One document per account, at most:
          requests/{uid}  (document ID = the poster's Firebase Auth user ID)
          {
-           name:      "Alex Tremblay",
-           campus:    "John Abbott College",
-           area:      "kirkland",          // an id from AREAS below
-           comment:   "Mornings around 8 AM, can chip in for gas",
-           createdAt: <serverTimestamp>
+           name:            "Alex Tremblay",
+           campus:          "John Abbott College",
+           comment:         "Mornings around 8 AM, can chip in for gas",
+           startingAddress: "123 Rue Sainte-Catherine O, Montreal, QC",  // for match-making only
+           lat:             45.5017,                                    // for match-making only
+           lng:             -73.5673,                                   // for match-making only
+           area:            "kirkland",   // optional: an id from AREAS; worked out from lat/lng if missing
+           createdAt:       <serverTimestamp>
          }
-       No contact info or exact address in here: this collection is public.
-       Accounts without a request have no document, so they get no pin. */
+       This page NEVER displays startingAddress, lat or lng: they only decide
+       which neighbourhood pin a request belongs to. Contact info stays in
+       users/{uid}. Accounts without a request have no document, so no pin. */
     const COLLECTION = "requests";
 
     // Open index.html?demo to use made-up data instead of Firestore.
@@ -649,12 +653,12 @@
         ];
         const campuses = ["John Abbott College", "Concordia University", "McGill University", "Vanier College"];
         const out = []; let i = 0;
-        // Demo records follow the public request format (area instead of address).
+        // Demo records follow the request format above.
         for (const [addr, n] of places) for (let k = 0; k < n; k++, i++) {
             const names = ["Alex T.", "Maya R.", "Samuel L.", "Inès B.", "Noah K.", "Chloé D.", "Omar H.", "Léa P."];
             const notes = ["Looking for morning rides around 8 AM on weekdays, can chip in for gas.", "", "Mon/Wed/Fri, back home after 5 PM.", "Have a car, can drive twice a week."];
             out.push({ id: "demo" + i, name: names[i % names.length], comment: notes[i % notes.length], campus: campuses[i % campuses.length],
-                       area: areaFromAddress(addr)?.id, createdAt: new Date(Date.now() - i * 3.7 * 3600e3).toISOString() });
+                       startingAddress: addr, area: areaFromAddress(addr)?.id, createdAt: new Date(Date.now() - i * 3.7 * 3600e3).toISOString() });
         }
         return out;
     }
